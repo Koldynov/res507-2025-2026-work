@@ -96,26 +96,39 @@ The app runs without PostgreSQL and `/health` does not query the database, so qu
 Added a `livenessProbe` (HTTP GET `/health`, period 5s, failureThreshold 3) next to the readiness probe.
 
 Healthy baseline, 0 restarts:
+```
+quote-app-5474798cbf-7p57q   1/1     Running   0          2m14s
+quote-app-5474798cbf-d8n8f   1/1     Running   0          2m20s
+quote-app-5474798cbf-wr6lz   1/1     Running   0          2m8s
+```
 
 Deliberate failure – only the liveness path changed to `/does-not-exist` (readiness kept `/health`):
-quote-app-5474798cbf-7p57q 1/1 Running 0 2m14s
-quote-app-5474798cbf-d8n8f 1/1 Running 0 2m20s
-quote-app-5474798cbf-wr6lz 1/1 Running 0 2m8s
+```
+quote-app-85b8c4c94b-28tgk   0/1     CrashLoopBackOff   9 (2m53s ago)   15m
+quote-app-85b8c4c94b-f8pxs   0/1     CrashLoopBackOff   9 (2m9s ago)    15m
+quote-app-85b8c4c94b-m9tv9   0/1     CrashLoopBackOff   9 (2m12s ago)   14m
+```
+```
+Restart Count:  9
+Liveness:       http-get http://:3000/does-not-exist delay=5s timeout=1s period=5s #success=1 #failure=3
+Warning  Unhealthy  Liveness probe failed: HTTP probe failed with statuscode: 404
+Normal   Killing    Container quote-app failed liveness probe, will be restarted
+```
+EndpointSlice during the failure – no Pod could receive traffic:
+```
+quote-app-85b8c4c94b-f8pxs      ready=false
+quote-app-85b8c4c94b-28tgk      ready=false
+quote-app-85b8c4c94b-m9tv9      ready=false
+```
 
+Recovery – liveness path restored to `/health`; after 45 s the new Pods still had 0 restarts:
+```
+deployment "quote-app" successfully rolled out
 
-Deliberate failure – only the liveness path changed to `/does-not-exist` (readiness kept `/health`):
-
-quote-app-85b8c4c94b-28tgk 0/1 CrashLoopBackOff 9 (2m53s ago) 15m
-quote-app-85b8c4c94b-f8pxs 0/1 CrashLoopBackOff 9 (2m9s ago) 15m
-quote-app-85b8c4c94b-m9tv9 0/1 CrashLoopBackOff 9 (2m12s ago) 14m
-
-Restart Count: 9
-Liveness: http-get http://:3000/does-not-exist delay=5s timeout=1s period=5s #success=1 #failure=3
-Warning Unhealthy Liveness probe failed: HTTP probe failed with statuscode: 404
-Normal Killing Container quote-app failed liveness probe, will be restarted
-
-
-Recovery – liveness path restored to `/health`: rollout completed and the new Pods stayed `1/1` with 0 restarts.
+quote-app-5474798cbf-6fpqd   1/1     Running   0          113s
+quote-app-5474798cbf-6qb4n   1/1     Running   0          107s
+quote-app-5474798cbf-bzcjw   1/1     Running   0          119s
+```
 
 What this demonstrates:
 - **Liveness** answers "is the container alive?". After 3 consecutive failures the kubelet kills and restarts the container; repeated restarts lead to `CrashLoopBackOff` with growing back-off delays.
