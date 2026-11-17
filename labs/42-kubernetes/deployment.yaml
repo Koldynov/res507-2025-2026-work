@@ -18,6 +18,12 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: quote-db-secret
+                  key: DATABASE_URL
           readinessProbe:
             httpGet:
               path: /health
